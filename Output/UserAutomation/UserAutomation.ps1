@@ -1,3 +1,139 @@
+Function Get-GradYear {
+
+    [CmdletBinding()]
+    param
+    (
+        [int]$GradeLevel,
+        [Switch]$TwoDigit
+    )
+    # this function calculates the Grad Year by taking the Grade_Level as input
+    # and counting, starting at Grade_Level till 8 (which is when students graduate)
+    # and adding that ammount to the current year.
+    # it then returns that value so we can store it later.
+
+    $month = 7, 8, 9, 10, 11, 12
+    $curMonth = (Get-Date).Month
+    if ($month -contains $curMonth) {
+        $SchoolYear = $(get-date).year + 1
+    } else {
+        $SchoolYear = $(get-date).year
+    }
+
+    $yeartilgrad = 8 - $GradeLevel
+    [string]$gradyear = $SchoolYear + $yeartilgrad
+
+    if ($TwoDigit) {
+        return $gradyear.Substring(2, 2)
+    } else {
+        return $gradyear
+    }
+}
+function Generate-StudentUsername {
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        $Student
+    )
+    
+    begin {
+
+    }
+    
+    process {
+        Write-Host "Processing $($student.guid)" -ForegroundColor Green
+        $CurSubString = 1
+        $GradYear = Get-GradYear -GradeLevel $Student.Grade_Level -TwoDigit
+        $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear" -Value $GradYear
+        $SamAccountName = $student.Last_name + $student.First_Name.SubString(0,$curSubString) + $Student.CalcGradYear
+
+        $Duplicates = Get-ADUser -Filter "SamAccountName -like '$($SamAccountName)*'"
+    
+        if ($Null -eq $Duplicates) {
+            Write-Host "No Duplicates Found" -ForegroundColor Green
+            $Student | Add-Member -MemberType NoteProperty -Name "SamAccountName" -Value $SamAccountName
+            $Student
+        } 
+
+        if ($Null -ne $Duplicates) {
+            Write-Host "Duplicates Found" -ForegroundColor Red
+            $SamAccountName
+            $Duplicates.SamAccountName
+            
+            do {
+                $CurSubString = $CurSubString + 1
+                $SamAccountName = $student.last_name + $student.First_Name.SubString(0,$curSubString) + $Student.CalcGradYear
+            } until ($null -eq $($Duplicates | Where-Object {$_.SamAccountName -eq $SamAccountName}))
+
+            $Student | Add-Member -MemberType NoteProperty -Name "SamAccountName" -Value $SamAccountName
+            $Student
+        }
+    }
+    
+    end {
+        
+    }
+}
+function Generate-StudentPassword {
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        [PSCustomObject[]]
+        $Student
+    )
+    
+    begin {
+
+    }
+    
+    process {
+        $MMS = $False
+        if ($Student.schoolid -eq "51") {
+            $MMS = $True
+        } else {
+            $MMS = $False
+        }
+
+        if ($MMS -eq $False) {
+            $Birthday = Get-Date $student.dob -format Mdyyyy
+            $Password = $student.First_Name.ToLower().substring(0, 1) + $student.Last_Name.ToLower().Substring(0, 1) + $Birthday
+            $Student | Add-Member -MemberType NoteProperty -Name "PasswordAsPlainText" -Value $Password
+            $Student
+        }
+
+        if ($MMS -eq $True) {
+            # return Get-Random -Minimum 10000000 -Maximum 99999999
+            $password = -join (((50..57) + (97..104) + (106..107) + (109..110) + (112..122))  | Get-Random -Count 8 | ForEach-Object {[char]$_})
+            $Student | Add-Member -MemberType NoteProperty -Name "PasswordAsPlainText" -Value $Password
+            $Student
+        }
+    }
+
+    
+    end {
+        
+    }
+}
+function Generate-StudentADProperties {
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        [PSCustomObject[]]
+        $Student
+    )
+    
+    begin {
+
+    }
+    
+    process {
+    
+    }
+
+    
+    end {
+        
+    }
+}
 function Exit-Student {
     [CmdletBinding()]
     param (
@@ -72,21 +208,67 @@ $Data = Import-PowershellDataFile -Path (Join-Path -Path $Config.BaseDirectory -
 Import-Module -Name $Config.RequiredModules
 
 $PSStudents = Get-MPSAStudent -filter {$_.Name -like "*"} -DataBlob $Data
-$StudentDB = Import-CSV -Path (Join-Path -Path $Data.rootPath -ChildPath $Data.fileNames.studentAccountDB)
+$StudentDBPath = (Join-Path -Path $Data.rootPath -ChildPath $Data.fileNames.studentAccountDB)
+$StudentDB = Import-CSV -Path $StudentDBPath
 
 $Dif = Compare-Object -ReferenceObject ($PSStudents.GUID) -DifferenceObject ($StudentDB.GUID)
 
-$ItemsNotInDB = $Dif | Where-Object {$_.SideIndicator -eq "<="}
-$ItemsNotInPS = $Dif | Where-Object {$_.SideIndicator -eq "=>"}
+$OnboardingStudents = $Dif | Where-Object {$_.SideIndicator -eq "<="}
+$OffboardingStudents = $Dif | Where-Object {$_.SideIndicator -eq "=>"}
+$ADUsers = Get-ADUser -filter "EmployeeNumber -like '*'" -Properties EmployeeNumber,displayname,distinguishedname
 
+$ConfirmedUniqueUsernames = @()
+$ExistingUsers = @()
 
-$NewStudentResults = ForEach ($NewStudent in $ItemsNotInDB){
-    Create-Student -Student $NewStudent
+ForEach ($ID in $OnboardingStudents){
+    $NewStudent = $PSStudents | Where-Object {$_.GUID -eq $ID.InputObject}
+    $exactMatch = $ADUsers | Where-Object {$_.Employeenumber -eq $NewStudent.GUID}
+
+    if ($null -ne $exactMatch) {
+        Write-Host "Found in AD"
+        $DNArry = $exactMatch.distinguishedname -split ","
+        $OU = $DNArry[2..$DNArry.length] -join ","
+        
+        $NewStudent | Add-Member -memberType NoteProperty -Name "SamAccountName" -Value $exactMatch.SamAccountName
+        $NewStudent | Add-Member -MemberType NoteProperty -Name "OU" -Value $OU
+        $NewStudent | Add-Member -MemberType NoteProperty -Name "Exists" -Value $TRUE
+        $NewStudent | Add-Member -MemberType NoteProperty -Name "Email" -Value $ExactMatch.UserPrincipalName
+        $NewStudent = Generate-StudentPassword -Student $NewStudent
+
+        $ExistingUsers += $NewStudent
+    } else {
+        Write-Host "Not Found In AD"
+        $NewStudentUsername = Generate-StudentUserName -Student $NewStudent
+        $ConfirmedUniqueUsernames += $NewStudentUsername
+    }
+
 }
 
-$ExitedStudentResults = ForEach ($LeavingStudent in $ItemsNotInPS) {
+ForEach ($student in $ExistingUsers) {
+    $Entry = "`"$($Student.Guid)`",`"$($Student.SamAccountName)`",`"$($Student.OU)`",`"$($Student.PasswordAsPlainText)`",`"$($Student.Email)`""
+    Write-Host "Writing to DB: $Entry"
+    #Add-Content -Path $StudentDBPath -Value $Entry
+}
+
+<#
+$NewStudent = Generate-StudentPassword -Student $NewStudent
+$NewStudent = Generate-StudentADProperties -Student $NewStudent
+Add-StudentDBEntry -Student $NewStudent -DB $StudentDBPath
+#>
+
+<#
+$ExitedStudentResults = ForEach ($LeavingStudent in $OffboardingStudents) {
+    Disable-ADAccount -Identity
+    Move-ADObject -object -ou $pathtodisabledou
     Exit-Student -Student $LeavingStudent
-}
+    Remove-StudentDBEntry
+}#>
+
+
+
+
+
+
 
 
 

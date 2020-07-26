@@ -15,6 +15,8 @@ $Dif = Compare-Object -ReferenceObject ($PSStudents.GUID) -DifferenceObject ($St
 $OnboardingStudents = $Dif | Where-Object {$_.SideIndicator -eq "<="}
 $OffboardingStudents = $Dif | Where-Object {$_.SideIndicator -eq "=>"}
 
+$ConfirmedUniqueUsernames = @()
+$ExistingUsers = @()
 
 $NewStudentResults = ForEach ($NewStudent in $OnboardingStudents){
     $NewStudent = Generate-StudentUserName -Student $NewStudent
