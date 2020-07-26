@@ -7,18 +7,25 @@ $Data = Import-PowershellDataFile -Path (Join-Path -Path $Config.BaseDirectory -
 Import-Module -Name $Config.RequiredModules
 
 $PSStudents = Get-MPSAStudent -filter {$_.Name -like "*"} -DataBlob $Data
-$StudentDB = Import-CSV -Path (Join-Path -Path $Data.rootPath -ChildPath $Data.fileNames.studentAccountDB)
+$StudentDBPath = (Join-Path -Path $Data.rootPath -ChildPath $Data.fileNames.studentAccountDB)
+$StudentDB = Import-CSV -Path $StudentDBPath
 
 $Dif = Compare-Object -ReferenceObject ($PSStudents.GUID) -DifferenceObject ($StudentDB.GUID)
 
-$ItemsNotInDB = $Dif | Where-Object {$_.SideIndicator -eq "<="}
-$ItemsNotInPS = $Dif | Where-Object {$_.SideIndicator -eq "=>"}
+$OnboardingStudents = $Dif | Where-Object {$_.SideIndicator -eq "<="}
+$OffboardingStudents = $Dif | Where-Object {$_.SideIndicator -eq "=>"}
 
 
-$NewStudentResults = ForEach ($NewStudent in $ItemsNotInDB){
-    Create-Student -Student $NewStudent
+$NewStudentResults = ForEach ($NewStudent in $OnboardingStudents){
+    $NewStudent = Generate-StudentUserName -Student $NewStudent
+    $NewStudent = Generate-StudentPassword -Student $NewStudent
+    $NewStudent = Generate-StudentADProperties -Student $NewStudent
+    Add-StudentDBEntry -Student $NewStudent -DB $StudentDBPath
 }
 
-$ExitedStudentResults = ForEach ($LeavingStudent in $ItemsNotInPS) {
+$ExitedStudentResults = ForEach ($LeavingStudent in $OffboardingStudents) {
+    Disable-ADAccount -Identity
+    Move-ADObject -object -ou $pathtodisabledou
     Exit-Student -Student $LeavingStudent
+    Remove-StudentDBEntry
 }
