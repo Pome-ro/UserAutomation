@@ -3,7 +3,7 @@ function Exit-Student {
     param (
         # Student Object
         [Parameter(Mandatory)]
-        [Object]
+        [PSCustomObject[]]
         $Student
     )
     

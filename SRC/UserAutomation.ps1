@@ -15,7 +15,6 @@ $Dif = Compare-Object -ReferenceObject ($PSStudents.GUID) -DifferenceObject ($St
 
 $OnboardingStudents = $Dif | Where-Object {$_.SideIndicator -eq "<="}
 $OffboardingStudents = $Dif | Where-Object {$_.SideIndicator -eq "=>"}
-$ADUsers = Get-ADUser -filter "EmployeeNumber -like '*'" -Properties EmployeeNumber,displayname,distinguishedname
 
 $ConfirmedUniqueUsernames = @()
 $ExistingUsers = @()
@@ -75,3 +74,16 @@ ForEach ($Student in $ConfirmedUniqueUsernames) {
 
 }
 
+$NewStudentResults = ForEach ($NewStudent in $OnboardingStudents){
+    $NewStudent = Generate-StudentUserName -Student $NewStudent
+    $NewStudent = Generate-StudentPassword -Student $NewStudent
+    $NewStudent = Generate-StudentADProperties -Student $NewStudent
+    Add-StudentDBEntry -Student $NewStudent -DB $StudentDBPath
+}
+
+$ExitedStudentResults = ForEach ($LeavingStudent in $OffboardingStudents) {
+    Disable-ADAccount -Identity
+    Move-ADObject -object -ou $pathtodisabledou
+    Exit-Student -Student $LeavingStudent
+    Remove-StudentDBEntry
+}

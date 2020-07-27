@@ -32,6 +32,7 @@ function Generate-StudentUsername {
     [CmdletBinding()]
     param (
         [Parameter()]
+        [PSCustomObject[]]
         $Student
     )
     
@@ -78,7 +79,11 @@ function Generate-StudentPassword {
     param (
         [Parameter()]
         [PSCustomObject[]]
-        $Student
+        $Student,
+        
+        [Parameter()]
+        [PSCustomObject]
+        $Datablob
     )
     
     begin {
@@ -86,21 +91,21 @@ function Generate-StudentPassword {
     }
     
     process {
-        $MMS = $False
-        if ($Student.schoolid -eq "51") {
-            $MMS = $True
+        $MiddleSchool = $False
+        if ($Student.schoolid -eq $Datablob.School.ID.MMS) {
+            $MiddleSchool = $True
         } else {
-            $MMS = $False
+            $MiddleSchool = $False
         }
 
-        if ($MMS -eq $False) {
+        if ($MiddleSchool -eq $False) {
             $Birthday = Get-Date $student.dob -format Mdyyyy
             $Password = $student.First_Name.ToLower().substring(0, 1) + $student.Last_Name.ToLower().Substring(0, 1) + $Birthday
             $Student | Add-Member -MemberType NoteProperty -Name "PasswordAsPlainText" -Value $Password
             $Student
         }
 
-        if ($MMS -eq $True) {
+        if ($MiddleSchool -eq $True) {
             # return Get-Random -Minimum 10000000 -Maximum 99999999
             $password = -join (((50..57) + (97..104) + (106..107) + (109..110) + (112..122))  | Get-Random -Count 8 | ForEach-Object {[char]$_})
             $Student | Add-Member -MemberType NoteProperty -Name "PasswordAsPlainText" -Value $Password
@@ -118,7 +123,11 @@ function Generate-StudentADProperties {
     param (
         [Parameter()]
         [PSCustomObject[]]
-        $Student
+        $Student,
+        # Parameter help description
+        [Parameter()]
+        [PSCustomObject]
+        $DataBlob
     )
     
     begin {
@@ -126,7 +135,20 @@ function Generate-StudentADProperties {
     }
     
     process {
-    
+        $SchoolID = $Student.SchoolID
+        $SchoolData = $DataBlob.School.$SchoolID
+        $OU = "OU=" + $Student.CalcGradYear + "," + $SchoolData.ou.students
+        $description = $SchoolData.Shortname + " Student"
+        $DisplayName = $Student.Last_name + ", " + $Student.First_Name
+        $scriptPath = "Student" + $SchoolData.Initials + ".bat"
+        $Student | Add-Member -memberType NoteProperty -Name "OU" -Value $OU
+        $Student | Add-Member -MemberType NoteProperty -Name "Email" -Value ($Student.SamAccountName + "@mpssites.org")
+        $Student | Add-Member -MemberType NoteProperty -Name "Pager" -Value $Student.StudentNumber
+        $Student | Add-Member -MemberType NoteProperty -Name "Description" -Value $description
+        $Student | Add-Member -MemberType NoteProperty -Name "DisplayName" -Value $DisplayName
+        $Student | Add-Member -MemberType NoteProperty -Name "scriptPath" -Value $scriptPath
+        $Student
+
     }
 
     
@@ -139,7 +161,7 @@ function Exit-Student {
     param (
         # Student Object
         [Parameter(Mandatory)]
-        [Object]
+        [PSCustomObject[]]
         $Student
     )
     
@@ -199,17 +221,41 @@ function Check-Module {
         
     }
 }
+function Add-StudentDBEntry {
+    [CmdletBinding()]
+    param (
+        # Student Object
+        [Parameter(Mandatory)]
+        [PSCustomObject[]]
+        $Student
+    )
+    
+    begin {
+        
+    }
+    
+    process {
+        $Entry = "`"$($Student.Guid)`",`"$($Student.SamAccountName)`",`"$($Student.OU)`",`"$($Student.PasswordAsPlainText)`",`"$($Student.Email)`""
+        Write-Host "Writing to DB: $Entry"
+        Add-Content -Path $StudentDBPath -Value $Entry
+    }
+    
+    end {
+        
+    }
+}
 
 # ---------------- Start Script ---------------- #
-
-
 $Config = Import-PowershellDataFile -Path "$PSScriptRoot\Config.psd1"
 $Data = Import-PowershellDataFile -Path (Join-Path -Path $Config.BaseDirectory -ChildPath $Config.DataBlobFileName)
 Import-Module -Name $Config.RequiredModules
 
-$PSStudents = Get-MPSAStudent -filter {$_.Name -like "*"} -DataBlob $Data
+$OutplacedID = $Data.School.ID.Outplaced
+$PSStudents = Get-MPSAStudent -filter {$_.SchoolID -ne $OutplacedID} -DataBlob $Data
 $StudentDBPath = (Join-Path -Path $Data.rootPath -ChildPath $Data.fileNames.studentAccountDB)
 $StudentDB = Import-CSV -Path $StudentDBPath
+
+# Filter out Outplaced students
 
 $Dif = Compare-Object -ReferenceObject ($PSStudents.GUID) -DifferenceObject ($StudentDB.GUID)
 
@@ -225,6 +271,8 @@ ForEach ($ID in $OnboardingStudents){
     $exactMatch = $ADUsers | Where-Object {$_.Employeenumber -eq $NewStudent.GUID}
 
     if ($null -ne $exactMatch) {
+        
+        <#
         Write-Host "Found in AD"
         $DNArry = $exactMatch.distinguishedname -split ","
         $OU = $DNArry[2..$DNArry.length] -join ","
@@ -236,33 +284,27 @@ ForEach ($ID in $OnboardingStudents){
         $NewStudent = Generate-StudentPassword -Student $NewStudent
 
         $ExistingUsers += $NewStudent
+        #>
+
     } else {
         Write-Host "Not Found In AD"
-        $NewStudentUsername = Generate-StudentUserName -Student $NewStudent
-        $ConfirmedUniqueUsernames += $NewStudentUsername
+        $NewStudent.schoolid
+
+        $NewStudent = Generate-StudentUserName -Student $NewStudent
+        $NewStudent = Generate-StudentPassword -Student $NewStudent
+        $NewStudent = Generate-StudentADProperties -Student $NewStudent
+
+        $ConfirmedUniqueUsernames += $NewStudent
     }
 
 }
 
-ForEach ($student in $ExistingUsers) {
-    $Entry = "`"$($Student.Guid)`",`"$($Student.SamAccountName)`",`"$($Student.OU)`",`"$($Student.PasswordAsPlainText)`",`"$($Student.Email)`""
-    Write-Host "Writing to DB: $Entry"
-    #Add-Content -Path $StudentDBPath -Value $Entry
+ForEach ($Student in $ConfirmedUniqueUsernames) {
+    $Student.schoolid
+    Add-StudentDBEntry -student $Student
+    New-ADUser -Name $student.displayname -SamAccountName $student.SamAccountName -Path $student.ou -ScriptPath $student.scriptpath -DisplayName $student.displayname -Description $student.Description -mail $student.email -WhatIf
 }
 
-<#
-$NewStudent = Generate-StudentPassword -Student $NewStudent
-$NewStudent = Generate-StudentADProperties -Student $NewStudent
-Add-StudentDBEntry -Student $NewStudent -DB $StudentDBPath
-#>
-
-<#
-$ExitedStudentResults = ForEach ($LeavingStudent in $OffboardingStudents) {
-    Disable-ADAccount -Identity
-    Move-ADObject -object -ou $pathtodisabledou
-    Exit-Student -Student $LeavingStudent
-    Remove-StudentDBEntry
-}#>
 
 
 

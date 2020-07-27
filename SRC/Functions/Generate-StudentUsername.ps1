@@ -2,6 +2,7 @@ function Generate-StudentUsername {
     [CmdletBinding()]
     param (
         [Parameter()]
+        [PSCustomObject[]]
         $Student
     )
     
