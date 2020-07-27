@@ -1,14 +1,15 @@
 
 # ---------------- Start Script ---------------- #
-
-
 $Config = Import-PowershellDataFile -Path "$PSScriptRoot\Config.psd1"
 $Data = Import-PowershellDataFile -Path (Join-Path -Path $Config.BaseDirectory -ChildPath $Config.DataBlobFileName)
 Import-Module -Name $Config.RequiredModules
 
-$PSStudents = Get-MPSAStudent -filter {$_.Name -like "*"} -DataBlob $Data
+$OutplacedID = $Data.School.ID.Outplaced
+$PSStudents = Get-MPSAStudent -filter {$_.SchoolID -ne $OutplacedID} -DataBlob $Data
 $StudentDBPath = (Join-Path -Path $Data.rootPath -ChildPath $Data.fileNames.studentAccountDB)
 $StudentDB = Import-CSV -Path $StudentDBPath
+
+# Filter out Outplaced students
 
 $Dif = Compare-Object -ReferenceObject ($PSStudents.GUID) -DifferenceObject ($StudentDB.GUID)
 
@@ -41,30 +42,36 @@ ForEach ($ID in $OnboardingStudents){
 
     } else {
         Write-Host "Not Found In AD"
-        $NewStudentUsername = Generate-StudentUserName -Student $NewStudent
-        $NewStudentUsername = Generate-StudentPassword -Student $NewStudent
+        $NewStudent.schoolid
 
-        $ConfirmedUniqueUsernames += $NewStudentUsername
+        $NewStudent = Generate-StudentUserName -Student $NewStudent
+        $NewStudent = Generate-StudentPassword -Student $NewStudent
+        $NewStudent = Generate-StudentADProperties -Student $NewStudent -DataBlob $data
+        $NewStudent = Generate-StudentADGroups -Student $NewStudent -DataBlob $data
+        $NewStudent = Generate-StudentHomeDir -Student $NewStudent -DataBlob $data
+
+        $ConfirmedUniqueUsernames += $NewStudent
     }
 
 }
 
-ForEach ($student in $ExistingUsers) {
-    $Entry = "`"$($Student.Guid)`",`"$($Student.SamAccountName)`",`"$($Student.OU)`",`"$($Student.PasswordAsPlainText)`",`"$($Student.Email)`""
-    Write-Host "Writing to DB: $Entry"
-    #Add-Content -Path $StudentDBPath -Value $Entry
+ForEach ($Student in $ConfirmedUniqueUsernames) {
+    $Student.schoolid
+    Add-StudentDBEntry -student $Student
+
+    New-ADUser -Name $student.displayname -SamAccountName $student.SamAccountName -Path $student.ou -ScriptPath $student.scriptpath -DisplayName $student.displayname -Description $student.Description -mail $student.email -WhatIf
+    
+    foreach ($group in $student.adgroups) {
+
+        try {
+            Add-ADGroupMember $group $student.samaccountname
+        } catch {
+
+        }
+        if ($?) {
+
+        }
+    }
+
 }
 
-<#
-$NewStudent = Generate-StudentPassword -Student $NewStudent
-$NewStudent = Generate-StudentADProperties -Student $NewStudent
-Add-StudentDBEntry -Student $NewStudent -DB $StudentDBPath
-#>
-
-<#
-$ExitedStudentResults = ForEach ($LeavingStudent in $OffboardingStudents) {
-    Disable-ADAccount -Identity
-    Move-ADObject -object -ou $pathtodisabledou
-    Exit-Student -Student $LeavingStudent
-    Remove-StudentDBEntry
-}#>
