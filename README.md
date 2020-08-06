@@ -1,2 +1,2 @@
-# User Automation
-This script is used to automate the creation of accounts in a given environment. 
+# MPS User Creation DB Manager
+This script manages updating the DB for student account creation

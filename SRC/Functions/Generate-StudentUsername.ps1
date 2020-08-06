@@ -13,31 +13,36 @@ function Generate-StudentUsername {
     process {
         Write-Host "Processing $($student.guid)" -ForegroundColor Green
         $CurSubString = 1
-        $GradYear = Get-GradYear -GradeLevel $Student.Grade_Level -TwoDigit
-        $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear" -Value $GradYear
-        $SamAccountName = $student.Last_name + $student.First_Name.SubString(0,$curSubString) + $Student.CalcGradYear
+        $GradYear = 
+        $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear" -Value (Get-GradYear -GradeLevel $Student.Grade_Level)
+        $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear2digit" -Value $(Get-GradYear -GradeLevel $Student.Grade_Level -TwoDigit)
+        $Lname = $Student.Last_Name
+        $Finit = $student.First_Name.SubString(0,$curSubString)
 
+        $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
+        
+        If($SamAccountName.Length -gt 20){
+            Write-host "Name To Long" -ForegroundColor Red
+            do {
+                $lname = $lname.substring($Lname.length - 1)
+                $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
+            } until ($SamAccountName.length -lt 21)
+        }
+        
         $Duplicates = Get-ADUser -Filter "SamAccountName -like '$($SamAccountName)*'"
-    
-        if ($Null -eq $Duplicates) {
-            Write-Host "No Duplicates Found" -ForegroundColor Green
-            $Student | Add-Member -MemberType NoteProperty -Name "SamAccountName" -Value $SamAccountName
-            $Student
-        } 
-
+        
         if ($Null -ne $Duplicates) {
             Write-Host "Duplicates Found" -ForegroundColor Red
-            $SamAccountName
-            $Duplicates.SamAccountName
             
             do {
-                $CurSubString = $CurSubString + 1
-                $SamAccountName = $student.last_name + $student.First_Name.SubString(0,$curSubString) + $Student.CalcGradYear
+                $CurSubString = $CurSubString + 1 
+                $Finit = $student.First_Name.SubString(0,$curSubString)
+                $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
             } until ($null -eq $($Duplicates | Where-Object {$_.SamAccountName -eq $SamAccountName}))
-
-            $Student | Add-Member -MemberType NoteProperty -Name "SamAccountName" -Value $SamAccountName
-            $Student
         }
+
+        $Student | Add-Member -MemberType NoteProperty -Name "SamAccountName" -Value $SamAccountName
+        $Student
     }
     
     end {

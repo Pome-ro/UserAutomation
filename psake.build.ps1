@@ -34,11 +34,13 @@ task Build -depends Clean {
         $Content + (Get-Content -Path "$ScriptPath\$ScriptName.ps1" | Out-String) | Set-Content "$ScriptPath\$ScriptName.ps1"
         # Add-Content -Value $content -Path "$ScriptPath\$ScriptName.psm1"
     }
+    $Content = Get-Content -Path .\src\ScriptProperties.ps1 | Out-String
+    $Content + (Get-Content -Path "$ScriptPath\$ScriptName.ps1" | Out-String) | Set-Content "$ScriptPath\$ScriptName.ps1"
 
 }
 
 task Publish -depends Build, Test {
-    Publish-Module -Name $ScriptPath -Repository "MPSPSRepo"
+    Publish-Script -Path "$ScriptPath\$ScriptName.ps1" -Repository "MPSPSRepo"
 }
 
 task Exe -depends Build, Test {
