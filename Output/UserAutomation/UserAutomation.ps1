@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 1.0.5
+.VERSION 1.0.6
 
 .GUID 539d6a11-ba99-4fb0-9f51-d5a8c8c6ba93
 
@@ -229,6 +229,7 @@ function Add-StudentDBEntry {
         $StudentObj = New-Object -TypeName psobject
 
         $StudentObj | Add-Member -MemberType NoteProperty -Name GUID  -Value $Student.GUID
+        $StudentObj | Add-Member -MemberType NoteProperty -Name SamAccountName -Value $Student.SamAccountName
         $StudentObj | Add-Member -MemberType NoteProperty -Name OU  -Value $Student.OU
         $StudentObj | Add-Member -MemberType NoteProperty -Name PasswordAsPlainText  -Value $Student.PasswordAsPlainText
         $StudentObj | Add-Member -MemberType NoteProperty -Name Email  -Value $Student.Email
@@ -253,7 +254,6 @@ $Data = Import-PowershellDataFile -Path (Join-Path -Path $Config.BaseDirectory -
 Import-Module -Name $Config.RequiredModules
 
 $OutplacedID = $Data.School.ID.Outplaced
-$OutplacedID
 $PSStudents = Get-MPSAStudent -filter {$_.SchoolID -ne $OutplacedID} -DataBlob $Data
 $StudentDBPath = (Join-Path -Path $Data.rootPath -ChildPath $Data.fileNames.studentAccountDB)
 $StudentDB = Import-CSV -Path $StudentDBPath
@@ -296,6 +296,7 @@ ForEach ($ID in $OnboardingStudents){
         Write-Host "Not Found In AD" -ForegroundColor Green
 
         $NewStudent = Generate-StudentUserName -Student $NewStudent
+        Write-Host $NewStudent.SamAccountName
         $NewStudent = Generate-StudentPassword -Student $NewStudent
         $NewStudent = Generate-StudentADProperties -Student $NewStudent -DataBlob $data
         #$NewStudent = Generate-StudentADGroups -Student $NewStudent -DataBlob $data

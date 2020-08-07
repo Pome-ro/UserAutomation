@@ -46,6 +46,7 @@ ForEach ($ID in $OnboardingStudents){
         Write-Host "Not Found In AD" -ForegroundColor Green
 
         $NewStudent = Generate-StudentUserName -Student $NewStudent
+        Write-Host $NewStudent.SamAccountName
         $NewStudent = Generate-StudentPassword -Student $NewStudent
         $NewStudent = Generate-StudentADProperties -Student $NewStudent -DataBlob $data
         #$NewStudent = Generate-StudentADGroups -Student $NewStudent -DataBlob $data
