@@ -49,7 +49,8 @@ ForEach ($ID in $OnboardingStudents){
         Write-Host $NewStudent.SamAccountName
         $NewStudent = Generate-StudentPassword -Student $NewStudent
         $NewStudent = Generate-StudentADProperties -Student $NewStudent -DataBlob $data
-        #$NewStudent = Generate-StudentADGroups -Student $NewStudent -DataBlob $data
+        $NewStudent = Generate-StudentADGroups -Student $NewStudent -DataBlob $data
+        $NewStudent.ADGroups = $NewStudent.ADGroups -join ","
         #$NewStudent = Generate-StudentHomeDirPath -Student $NewStudent -DataBlob $data
 
         $StudentData = Add-StudentDBEntry -student $NewStudent -Path $StudentDBPath

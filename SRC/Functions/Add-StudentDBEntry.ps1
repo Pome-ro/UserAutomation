@@ -21,6 +21,8 @@ function Add-StudentDBEntry {
         $StudentObj | Add-Member -MemberType NoteProperty -Name GUID  -Value $Student.GUID
         $StudentObj | Add-Member -MemberType NoteProperty -Name SamAccountName -Value $Student.SamAccountName
         $StudentObj | Add-Member -MemberType NoteProperty -Name OU  -Value $Student.OU
+        $StudentObj | Add-Member -MemberType NoteProperty -Name SchoolID  -Value $Student.SchoolID
+        $StudentObj | Add-Member -MemberType NoteProperty -Name ADGroups  -Value $Student.ADGroups
         $StudentObj | Add-Member -MemberType NoteProperty -Name PasswordAsPlainText  -Value $Student.PasswordAsPlainText
         $StudentObj | Add-Member -MemberType NoteProperty -Name Email  -Value $Student.Email
         $StudentObj | Add-Member -MemberType NoteProperty -Name GradYear  -Value $Student.CalcGradYear

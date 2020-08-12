@@ -16,7 +16,6 @@ function Generate-StudentADProperties {
     
     process {
         $SchoolID = [string]$Student.SchoolID
-        write-host $SchoolID
         $SchoolData = $DataBlob.School.$SchoolID
  
         $OU = "OU=" + $Student.CalcGradYear + "," + $SchoolData.ou.students

@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 1.0.6
+.VERSION 1.0.9
 
 .GUID 539d6a11-ba99-4fb0-9f51-d5a8c8c6ba93
 
@@ -140,20 +140,17 @@ function Generate-StudentPassword {
     
     process {
         $MiddleSchool = $False
-        if ($Student.schoolid -eq $Datablob.School.ID.MMS) {
-            $MiddleSchool = $True
-        } else {
-            $MiddleSchool = $False
-        }
+        $SchoolID = [string]$Student.SchoolID
+        $SchoolData = $DataBlob.School.$SchoolID
 
-        if ($MiddleSchool -eq $False) {
+        if ($Student.SchoolID -ne '51') {
             $Birthday = Get-Date $student.dob -format Mdyyyy
             $Password = $student.First_Name.ToLower().substring(0, 1) + $student.Last_Name.ToLower().Substring(0, 1) + $Birthday
             $Student | Add-Member -MemberType NoteProperty -Name "PasswordAsPlainText" -Value $Password
             $Student
         }
 
-        if ($MiddleSchool -eq $True) {
+        if ($Student.SchoolID -eq '51') {
             # return Get-Random -Minimum 10000000 -Maximum 99999999
             $password = -join (((50..57) + (97..104) + (106..107) + (109..110) + (112..122))  | Get-Random -Count 8 | ForEach-Object {[char]$_})
             $Student | Add-Member -MemberType NoteProperty -Name "PasswordAsPlainText" -Value $Password
@@ -184,7 +181,6 @@ function Generate-StudentADProperties {
     
     process {
         $SchoolID = [string]$Student.SchoolID
-        write-host $SchoolID
         $SchoolData = $DataBlob.School.$SchoolID
  
         $OU = "OU=" + $Student.CalcGradYear + "," + $SchoolData.ou.students
@@ -199,6 +195,44 @@ function Generate-StudentADProperties {
         $Student | Add-Member -MemberType NoteProperty -Name "scriptPath" -Value $scriptPath
         
         
+        $Student
+
+    }
+
+    
+    end {
+        
+    }
+}
+function Generate-StudentADGroups {
+    [CmdletBinding()]
+    param (
+        [Parameter()]
+        [PSCustomObject[]]
+        $Student,
+        # Parameter help description
+        [Parameter()]
+        [PSCustomObject]
+        $DataBlob
+    )
+    
+    begin {
+
+    }
+    
+    process {
+        $SchoolID = $Student.SchoolID
+        $SchoolData = $DataBlob.School.$SchoolID
+        
+        $MidleSchoolGroups = "G$($Student.GradYear)", "AD-MMS-Print-Students", "InetFilter-5-8"
+        $ElementaryGrups = "AD-Pk4-Student-Print", "Students", "$($SchoolData.Initials)Students"
+
+        switch ($schoolid) {
+            '51' { $Student | Add-Member -MemberType NoteProperty -Name "ADGroups" -Value $MidleSchoolGroups -force }
+            {$_ -eq'2' -or '4' -or '5'} { $Student | Add-Member -MemberType NoteProperty -Name "ADGroups" -Value $ElementaryGrups -force }
+            Default {}
+        }
+
         $Student
 
     }
@@ -231,6 +265,8 @@ function Add-StudentDBEntry {
         $StudentObj | Add-Member -MemberType NoteProperty -Name GUID  -Value $Student.GUID
         $StudentObj | Add-Member -MemberType NoteProperty -Name SamAccountName -Value $Student.SamAccountName
         $StudentObj | Add-Member -MemberType NoteProperty -Name OU  -Value $Student.OU
+        $StudentObj | Add-Member -MemberType NoteProperty -Name SchoolID  -Value $Student.SchoolID
+        $StudentObj | Add-Member -MemberType NoteProperty -Name ADGroups  -Value $Student.ADGroups
         $StudentObj | Add-Member -MemberType NoteProperty -Name PasswordAsPlainText  -Value $Student.PasswordAsPlainText
         $StudentObj | Add-Member -MemberType NoteProperty -Name Email  -Value $Student.Email
         $StudentObj | Add-Member -MemberType NoteProperty -Name GradYear  -Value $Student.CalcGradYear
@@ -299,7 +335,8 @@ ForEach ($ID in $OnboardingStudents){
         Write-Host $NewStudent.SamAccountName
         $NewStudent = Generate-StudentPassword -Student $NewStudent
         $NewStudent = Generate-StudentADProperties -Student $NewStudent -DataBlob $data
-        #$NewStudent = Generate-StudentADGroups -Student $NewStudent -DataBlob $data
+        $NewStudent = Generate-StudentADGroups -Student $NewStudent -DataBlob $data
+        $NewStudent.ADGroups = $NewStudent.ADGroups -join ","
         #$NewStudent = Generate-StudentHomeDirPath -Student $NewStudent -DataBlob $data
 
         $StudentData = Add-StudentDBEntry -student $NewStudent -Path $StudentDBPath
@@ -340,6 +377,7 @@ $StudentDB | ConvertTo-Csv -NoTypeInformation | Out-File $StudentDBPath
 #>
 # Update Student Information End
 ##########################
+
 
 
 
