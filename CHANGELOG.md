@@ -1,3 +1,6 @@
+# 8/14/2020
+* Fixed bug where ADGroups were not being converted into a string to be stored in the DB. 
+
 # 8/12/2020
 * Fixed bug where password styles for MMS and ELEM were flipped. 
 

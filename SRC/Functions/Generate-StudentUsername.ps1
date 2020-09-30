@@ -13,10 +13,9 @@ function Generate-StudentUsername {
     process {
         Write-Host "Processing $($student.guid)" -ForegroundColor Green
         $CurSubString = 1
-        $GradYear = 
         $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear" -Value (Get-GradYear -GradeLevel $Student.Grade_Level)
         $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear2digit" -Value $(Get-GradYear -GradeLevel $Student.Grade_Level -TwoDigit)
-        $Lname = $Student.Last_Name
+        $Lname = Remove-Symbols -string $Student.Last_Name
         $Finit = $student.First_Name.SubString(0,$curSubString)
 
         $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit

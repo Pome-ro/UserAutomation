@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 1.0.9
+.VERSION 1.0.12
 
 .GUID 539d6a11-ba99-4fb0-9f51-d5a8c8c6ba93
 
@@ -40,6 +40,15 @@
 #> 
 Param()
 
+
+Function Remove-Symbols {
+    param(
+        [string]
+        $string
+    )
+    [regex]$reg = "[^\p{L}\p{Nd}]"
+    return $string -replace $reg
+}
 
 Function Get-GradYear {
 
@@ -86,10 +95,9 @@ function Generate-StudentUsername {
     process {
         Write-Host "Processing $($student.guid)" -ForegroundColor Green
         $CurSubString = 1
-        $GradYear = 
         $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear" -Value (Get-GradYear -GradeLevel $Student.Grade_Level)
         $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear2digit" -Value $(Get-GradYear -GradeLevel $Student.Grade_Level -TwoDigit)
-        $Lname = $Student.Last_Name
+        $Lname = Remove-Symbols -string $Student.Last_Name
         $Finit = $student.First_Name.SubString(0,$curSubString)
 
         $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
@@ -224,8 +232,8 @@ function Generate-StudentADGroups {
         $SchoolID = $Student.SchoolID
         $SchoolData = $DataBlob.School.$SchoolID
         
-        $MidleSchoolGroups = "G$($Student.GradYear)", "AD-MMS-Print-Students", "InetFilter-5-8"
-        $ElementaryGrups = "AD-Pk4-Student-Print", "Students", "$($SchoolData.Initials)Students"
+        $MidleSchoolGroups = "G$($Student.GradYear),AD-MMS-Print-Students,InetFilter-5-8"
+        $ElementaryGrups = "AD-Pk4-Student-Print,Students,$($SchoolData.Initials)Students"
 
         switch ($schoolid) {
             '51' { $Student | Add-Member -MemberType NoteProperty -Name "ADGroups" -Value $MidleSchoolGroups -force }
@@ -285,7 +293,7 @@ function Add-StudentDBEntry {
     }
 }
 # ---------------- Start Script ---------------- #
-$Config = Import-PowershellDataFile -Path ".\Config.psd1"
+$Config = Import-PowershellDataFile -Path "$PSScriptRoot\Config.psd1"
 $Data = Import-PowershellDataFile -Path (Join-Path -Path $Config.BaseDirectory -ChildPath $Config.DataBlobFileName)
 Import-Module -Name $Config.RequiredModules
 
@@ -308,75 +316,55 @@ $ADUsers = Get-ADUser -Filter "*" -Properties distinguishedname,SamAccountName,U
 ##########################
 # Create New Students Begin
 
-ForEach ($ID in $OnboardingStudents){
-    $NewStudent = $PSStudents | Where-Object {$_.GUID -eq $ID.InputObject}
-    $exactMatch = $ADUsers | Where-Object {$_.Employeenumber -eq $NewStudent.GUID}
+ ForEach ($ID in $OnboardingStudents){
+     $NewStudent = $PSStudents | Where-Object {$_.GUID -eq $ID.InputObject}
+     $exactMatch = $ADUsers | Where-Object {$_.Employeenumber -eq $NewStudent.GUID}
 
-    if ($null -ne $exactMatch) {
+     if ($null -ne $exactMatch) {
         
         
-        Write-Host "Found in AD" -ForegroundColor Yellow
-        $DNArry = $exactMatch.distinguishedname -split ","
-        $OU = $DNArry[2..$DNArry.length] -join ","
+         Write-Host "Found in AD" -ForegroundColor Yellow
+         $DNArry = $exactMatch.distinguishedname -split ","
+         $OU = $DNArry[2..$DNArry.length] -join ","
         
-        $NewStudent | Add-Member -memberType NoteProperty -Name "SamAccountName" -Value $exactMatch.SamAccountName
-        $NewStudent | Add-Member -MemberType NoteProperty -Name "OU" -Value $OU
-        $NewStudent | Add-Member -MemberType NoteProperty -Name "Email" -Value $ExactMatch.UserPrincipalName
-        $NewStudent = Generate-StudentPassword -Student $NewStudent
+         $NewStudent | Add-Member -memberType NoteProperty -Name "SamAccountName" -Value $exactMatch.SamAccountName
+         $NewStudent | Add-Member -MemberType NoteProperty -Name "OU" -Value $OU
+         $NewStudent | Add-Member -MemberType NoteProperty -Name "Email" -Value $ExactMatch.UserPrincipalName
+         $NewStudent = Generate-StudentPassword -Student $NewStudent
 
-        $StudentData = Add-StudentDBEntry -student $NewStudent -Path $StudentDBPath
-        $StudentDB += $StudentData
+         $StudentData = Add-StudentDBEntry -student $NewStudent -Path $StudentDBPath
+         $StudentDB += $StudentData
         
 
-    } else {
-        Write-Host "Not Found In AD" -ForegroundColor Green
+     } else {
+         Write-Host "Not Found In AD" -ForegroundColor Green
 
-        $NewStudent = Generate-StudentUserName -Student $NewStudent
-        Write-Host $NewStudent.SamAccountName
-        $NewStudent = Generate-StudentPassword -Student $NewStudent
-        $NewStudent = Generate-StudentADProperties -Student $NewStudent -DataBlob $data
-        $NewStudent = Generate-StudentADGroups -Student $NewStudent -DataBlob $data
-        $NewStudent.ADGroups = $NewStudent.ADGroups -join ","
-        #$NewStudent = Generate-StudentHomeDirPath -Student $NewStudent -DataBlob $data
+         $NewStudent = Generate-StudentUserName -Student $NewStudent
+         Write-Host $NewStudent.SamAccountName
+         $NewStudent = Generate-StudentPassword -Student $NewStudent
+         $NewStudent = Generate-StudentADProperties -Student $NewStudent -DataBlob $data
+         $NewStudent = Generate-StudentADGroups -Student $NewStudent -DataBlob $data
+         #$NewStudent = Generate-StudentHomeDirPath -Student $NewStudent -DataBlob $data
 
-        $StudentData = Add-StudentDBEntry -student $NewStudent -Path $StudentDBPath
-        $StudentDB += $StudentData
-    }
+         $StudentData = Add-StudentDBEntry -student $NewStudent -Path $StudentDBPath
+         $StudentDB += $StudentData
+     }
+ }
+
+$MMS5thGrade =  $ADUsers | Where-Object {$_.distinguishedname -like "*OU=2024,OU=OUstudents,OU=All-Users,OU=_MMS,DC=mps,DC=mansfieldct,DC=net"}
+
+foreach ($Student in $MMS5thGrade) {
+    Write-Host $Student.distinguishedname
 }
-$BackupName = $Data.fileNames.studentAccountDB + ".$(Get-Date -format MM.dd.yyyy.HH.mm)" + ".backup"
-Rename-Item -Path $StudentDBPath -NewName $BackupName
-$StudentDB | ConvertTo-Csv -NoTypeInformation | Out-File $StudentDBPath
+
+ $BackupName = $Data.fileNames.studentAccountDB + ".$(Get-Date -format MM.dd.yyyy.HH.mm)" + ".backup"
+ Rename-Item -Path $StudentDBPath -NewName $BackupName
+ $StudentDB | ConvertTo-Csv -NoTypeInformation | Out-File $StudentDBPath
 
 # Create New Students End
 ##########################
 
-##########################
-# Update Student Information Start
 
-<#
-$StudentDB = foreach ($Student in $StudentDB) {
-    $PSObj = $PSStudents | Where-Object {$_.GUID -eq $Student.GUID}
-    $PSObj | Add-Member -MemberType NoteProperty -Name "SamAccountName" -Value $Student.SamAccountName
-    $PSObj | Add-Member -MemberType NoteProperty -Name "CalcGradYear" -Value $Student.Gradyear
-    $PSObj = Generate-StudentADProperties -Student $PSObj -DataBlob $Data
-    $PSObj = Generate-StudentADGroups -Student $PSObj -DataBlob $Data
-    Write-Host $PSObj.OU
-    Write-Host $Student.Ou
-    if ($PSObj.OU -ne $Student.OU) {
-        $Student.OU = $PSObj.OU
-        Write-Host "OU Changed" -ForegroundColor Green
-    } else {
-        Write-Host "OU Not Changed" -ForegroundColor Red
-    }
-    $Student
-}
-
-$BackupName = $Data.fileNames.studentAccountDB + ".$(Get-Date -format MM.dd.yyyy.HH.mm)" + ".backup"
-Rename-Item -Path $StudentDBPath -NewName $BackupName
-$StudentDB | ConvertTo-Csv -NoTypeInformation | Out-File $StudentDBPath
-#>
-# Update Student Information End
-##########################
 
 
 
