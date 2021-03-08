@@ -5,7 +5,7 @@ Import-Module -Name $Config.RequiredModules
 
 $OutplacedID = $Data.School.ID.Outplaced
 $PSStudents = Get-MPSAStudent -filter {$_.SchoolID -ne $OutplacedID} -DataBlob $Data
-$PSStudents = $PSStudents | where-object {$_.EnrollStatus -eq -1 -or $_.EnrollStatus -eq 0}
+$PSStudents = $PSStudents | where-object {$_.Enroll_Status -eq -1 -or $_.Enroll_Status -eq 0}
 $StudentDBPath = (Join-Path -Path $Data.rootPath -ChildPath $Data.fileNames.studentAccountDB)
 $StudentDB = Import-CSV -Path $StudentDBPath
 
