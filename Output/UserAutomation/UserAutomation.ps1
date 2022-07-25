@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 1.0.13
+.VERSION 1.0.18
 
 .GUID 539d6a11-ba99-4fb0-9f51-d5a8c8c6ba93
 
@@ -98,31 +98,55 @@ function Generate-StudentUsername {
         $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear" -Value (Get-GradYear -GradeLevel $Student.Grade_Level)
         $Student | Add-Member -MemberType NoteProperty -Name "CalcGradYear2digit" -Value $(Get-GradYear -GradeLevel $Student.Grade_Level -TwoDigit)
         $Lname = Remove-Symbols -string $Student.Last_Name
+        $Fname = Remove-Symbols -string $Student.First_Name
         $Finit = $student.First_Name.SubString(0,$curSubString)
 
-        $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
-        
-        If($SamAccountName.Length -gt 20){
-            Write-host "Name To Long" -ForegroundColor Red
-            do {
-                $lname = $lname.substring($Lname.length - 1)
-                $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
-            } until ($SamAccountName.length -lt 21)
-        }
-        
-        $Duplicates = Get-ADUser -Filter "SamAccountName -like '$($SamAccountName)*'"
-        
-        if ($Null -ne $Duplicates) {
-            Write-Host "Duplicates Found" -ForegroundColor Red
+        $intGradYear = [int]$student.CalcGradYear
+
+        if ($intGradYear -ge 2032) {
+            Write-Host "Processing New Naming Convention"
+            $SamAccountName = $student.student_number
+            $UserPrincipalName = "$Fname.$Lname@mpssites.org"
+            $Duplicates = Get-ADUser -Filter "SamAccountName -like '$($SamAccountName)*'"
             
-            do {
-                $CurSubString = $CurSubString + 1 
-                $Finit = $student.First_Name.SubString(0,$curSubString)
-                $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
-            } until ($null -eq $($Duplicates | Where-Object {$_.SamAccountName -eq $SamAccountName}))
+            if ($Null -ne $Duplicates) {
+                Write-Host "Duplicates Found" -ForegroundColor Red
+                
+                do {
+                    $CurSubString = $CurSubString + 1 
+                    $Finit = $student.First_Name.SubString(0,$curSubString)
+                    $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
+                } until ($null -eq $($Duplicates | Where-Object {$_.SamAccountName -eq $SamAccountName}))
+            }
+            
+        } else {
+            Write-Host "Processing Old Naming Convention"
+            $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
+            If($SamAccountName.Length -gt 20){
+                Write-host "Name To Long" -ForegroundColor Red
+                do {
+                    $lname = $lname.substring($Lname.length - 1)
+                    $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
+                } until ($SamAccountName.length -lt 21)
+            }
+            $UserPrincipalName = "$SamAccountName@mpssites.org"
+            $Duplicates = Get-ADUser -Filter "SamAccountName -like '$($SamAccountName)*'"
+            
+            if ($Null -ne $Duplicates) {
+                Write-Host "Duplicates Found" -ForegroundColor Red
+                
+                do {
+                    $CurSubString = $CurSubString + 1 
+                    $Finit = $student.First_Name.SubString(0,$curSubString)
+                    $SamAccountName = $Lname + $Finit + $Student.CalcGradYear2digit
+                } until ($null -eq $($Duplicates | Where-Object {$_.SamAccountName -eq $SamAccountName}))
+            }
         }
+       
 
         $Student | Add-Member -MemberType NoteProperty -Name "SamAccountName" -Value $SamAccountName
+        $Student | Add-Member -MemberType NoteProperty -Name "UserPrincipalName" -Value $UserPrincipalName
+
         $Student
     }
     
@@ -192,12 +216,12 @@ function Generate-StudentADProperties {
         $SchoolData = $DataBlob.School.$SchoolID
  
         $OU = "OU=" + $Student.CalcGradYear + "," + $SchoolData.ou.students
-        $description = $SchoolData.Shortname + " Student"
+        $description = $SchoolData.Initials + " Student"
         $DisplayName = $Student.Last_name + ", " + $Student.First_Name
         $scriptPath = "Student" + $SchoolData.Initials + ".bat"
         $Student | Add-Member -memberType NoteProperty -Name "OU" -Value $OU
-        $Student | Add-Member -MemberType NoteProperty -Name "Email" -Value ($Student.SamAccountName + "@mpssites.org")
-        $Student | Add-Member -MemberType NoteProperty -Name "Pager" -Value $Student.StudentNumber
+        $Student | Add-Member -MemberType NoteProperty -Name "Email" -Value $Student.UserPrincipalName
+        $Student | Add-Member -MemberType NoteProperty -Name "Pager" -Value $Student.student_number
         $Student | Add-Member -MemberType NoteProperty -Name "Description" -Value $description
         $Student | Add-Member -MemberType NoteProperty -Name "DisplayName" -Value $DisplayName
         $Student | Add-Member -MemberType NoteProperty -Name "scriptPath" -Value $scriptPath
@@ -233,12 +257,14 @@ function Generate-StudentADGroups {
         $SchoolData = $DataBlob.School.$SchoolID
         
         $MidleSchoolGroups = "G$($Student.GradYear),AD-MMS-Print-Students,InetFilter-5-8"
-        $ElementaryGrups = "AD-Pk4-Student-Print,Students,$($SchoolData.Initials)Students"
+        $ElementaryGrups = "InetFilter-MES"
 
-        switch ($schoolid) {
-            '51' { $Student | Add-Member -MemberType NoteProperty -Name "ADGroups" -Value $MidleSchoolGroups -force }
-            {$_ -eq'2' -or '4' -or '5'} { $Student | Add-Member -MemberType NoteProperty -Name "ADGroups" -Value $ElementaryGrups -force }
-            Default {}
+        if($SchoolID -eq '51'){
+            # adds middle school groups
+            $Student | Add-Member -MemberType NoteProperty -Name "ADGroups" -Value $MidleSchoolGroups -force
+        } else {
+            # adds elementary school groups
+            $Student | Add-Member -MemberType NoteProperty -Name "ADGroups" -Value $ElementaryGrups -force
         }
 
         $Student
@@ -299,7 +325,7 @@ Import-Module -Name $Config.RequiredModules
 
 $OutplacedID = $Data.School.ID.Outplaced
 $PSStudents = Get-MPSAStudent -filter {$_.SchoolID -ne $OutplacedID} -DataBlob $Data
-$PSStudents = $PSStudents | where-object {$_.EnrollStatus -eq -1 -or $_.EnrollStatus -eq 0}
+$PSStudents = $PSStudents | where-object {$_.Enroll_Status -eq -1 -or $_.Enroll_Status -eq 0}
 $StudentDBPath = (Join-Path -Path $Data.rootPath -ChildPath $Data.fileNames.studentAccountDB)
 $StudentDB = Import-CSV -Path $StudentDBPath
 
@@ -352,14 +378,21 @@ ForEach ($ID in $OnboardingStudents){
     }
 }
 
+<#
 $MMS5thGrade =  $ADUsers | Where-Object {$_.distinguishedname -like "*OU=2024,OU=OUstudents,OU=All-Users,OU=_MMS,DC=mps,DC=mansfieldct,DC=net"}
 
 foreach ($Student in $MMS5thGrade) {
     Write-Host $Student.distinguishedname
-}
+}#>
 
 $BackupName = $Data.fileNames.studentAccountDB + ".$(Get-Date -format MM.dd.yyyy.HH.mm)" + ".backup"
+$StudentDBBackupPath = Join-Path -Path $data.rootPath -ChildPath $BackupName
 Rename-Item -Path $StudentDBPath -NewName $BackupName
+Move-Item -LiteralPath $StudentDBBackupPath -Destination $Data.backupPath
+$oldBackups = Get-ChildItem -LiteralPath $Data.backupPath -Filter "*.backup" | where-object {$_.creationTime -lt (get-date).AddDays(-7)}
+$oldBackups | Move-Item -Destination (Join-Path -Path $Data.backupPath -ChildPath "DeleteMe")
+
+
 $StudentDB | ConvertTo-Csv -NoTypeInformation | Out-File $StudentDBPath
 
 # Create New Students End

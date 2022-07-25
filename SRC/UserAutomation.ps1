@@ -58,14 +58,21 @@ ForEach ($ID in $OnboardingStudents){
     }
 }
 
+<#
 $MMS5thGrade =  $ADUsers | Where-Object {$_.distinguishedname -like "*OU=2024,OU=OUstudents,OU=All-Users,OU=_MMS,DC=mps,DC=mansfieldct,DC=net"}
 
 foreach ($Student in $MMS5thGrade) {
     Write-Host $Student.distinguishedname
-}
+}#>
 
 $BackupName = $Data.fileNames.studentAccountDB + ".$(Get-Date -format MM.dd.yyyy.HH.mm)" + ".backup"
+$StudentDBBackupPath = Join-Path -Path $data.rootPath -ChildPath $BackupName
 Rename-Item -Path $StudentDBPath -NewName $BackupName
+Move-Item -LiteralPath $StudentDBBackupPath -Destination $Data.backupPath
+$oldBackups = Get-ChildItem -LiteralPath $Data.backupPath -Filter "*.backup" | where-object {$_.creationTime -lt (get-date).AddDays(-7)}
+$oldBackups | Move-Item -Destination (Join-Path -Path $Data.backupPath -ChildPath "DeleteMe")
+
+
 $StudentDB | ConvertTo-Csv -NoTypeInformation | Out-File $StudentDBPath
 
 # Create New Students End

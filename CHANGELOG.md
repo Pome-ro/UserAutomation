@@ -1,3 +1,16 @@
+# 7/25/2022
+- Made changes to reflect the new organization of the district (new building). 
+
+# 5/2/2022
+
+- Added unit testing to the build script to ensure expected output from functions. 
+- Fixed issues with functions after creating these unit tests. 
+
+# 4/27/2022
+
+- Fixed issue where MMS students were not being assigned the correct groups. 
+- Added backup management steps to the end of the script. 
+
 # 3/8/2021
 
 - Added support for capturing Pre-Registered students.
