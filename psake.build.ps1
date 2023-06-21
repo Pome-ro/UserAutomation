@@ -101,7 +101,7 @@ task "Test\Functions" {
             ADGroups = "InetFilter-MES"
             ADProperties = @{
                 OU = "ou=" + $elmNC.GradYear + "," + $data.school.'6'.ou.students
-                Email = "Frank.PicardSampson@mpssites.org"
+                Email = "87654@mpssites.org"
                 Pager = $elmNC.student_number
                 Description = $data.school.'6'.Initials + " Student"
                 DisplayName = $elmNC.Last_Name + ", " + $elmNC.First_Name
@@ -166,6 +166,7 @@ task Clean {
 
 task Build -depends Clean,"Test\Functions" {
     $Functions = Get-ChildItem ".\SRC\Functions\"
+    $Version = "$(Get-Date -format "yy.M.d").$((New-TimeSpan -Hours (Get-Date -format "HH") -Minutes (Get-Date -format "mm")).totalminutes)"
 
     Copy-Item -Path ".\SRC\$ScriptName.ps1" -Destination $ScriptPath
     Copy-Item -Path ".\SRC\Config.psd1" -Destination $ScriptPath
@@ -177,6 +178,7 @@ task Build -depends Clean,"Test\Functions" {
         # Add-Content -Value $content -Path "$ScriptPath\$ScriptName.psm1"
     }
     $Content = Get-Content -Path .\src\ScriptProperties.ps1 | Out-String
+    $Content = $Content -replace "{{version}}",$version
     $Content + (Get-Content -Path "$ScriptPath\$ScriptName.ps1" | Out-String) | Set-Content "$ScriptPath\$ScriptName.ps1"
 
 }

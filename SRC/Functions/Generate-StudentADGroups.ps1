@@ -18,7 +18,7 @@ function Generate-StudentADGroups {
         $SchoolID = $Student.SchoolID
         $SchoolData = $DataBlob.School.$SchoolID
         
-        $MidleSchoolGroups = "G$($Student.GradYear),AD-MMS-Print-Students,InetFilter-5-8"
+        $MidleSchoolGroups = "G$($Student.CalcGradYear),AD-MMS-Print-Students,InetFilter-5-8"
         $ElementaryGrups = "InetFilter-MES"
 
         if($SchoolID -eq '51'){

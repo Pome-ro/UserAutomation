@@ -24,7 +24,7 @@ function Generate-StudentUsername {
         if ($intGradYear -ge 2032) {
             Write-Host "Processing New Naming Convention"
             $SamAccountName = $student.student_number
-            $UserPrincipalName = "$Fname.$Lname@mpssites.org"
+            $UserPrincipalName = "$($student.student_number)@mpssites.org"
             $Duplicates = Get-ADUser -Filter "SamAccountName -like '$($SamAccountName)*'"
             
             if ($Null -ne $Duplicates) {

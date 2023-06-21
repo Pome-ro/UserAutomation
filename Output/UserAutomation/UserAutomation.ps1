@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 1.0.18
+.VERSION 23.6.21.709
 
 .GUID 539d6a11-ba99-4fb0-9f51-d5a8c8c6ba93
 
@@ -106,7 +106,7 @@ function Generate-StudentUsername {
         if ($intGradYear -ge 2032) {
             Write-Host "Processing New Naming Convention"
             $SamAccountName = $student.student_number
-            $UserPrincipalName = "$Fname.$Lname@mpssites.org"
+            $UserPrincipalName = "$($student.student_number)@mpssites.org"
             $Duplicates = Get-ADUser -Filter "SamAccountName -like '$($SamAccountName)*'"
             
             if ($Null -ne $Duplicates) {
@@ -256,7 +256,7 @@ function Generate-StudentADGroups {
         $SchoolID = $Student.SchoolID
         $SchoolData = $DataBlob.School.$SchoolID
         
-        $MidleSchoolGroups = "G$($Student.GradYear),AD-MMS-Print-Students,InetFilter-5-8"
+        $MidleSchoolGroups = "G$($Student.CalcGradYear),AD-MMS-Print-Students,InetFilter-5-8"
         $ElementaryGrups = "InetFilter-MES"
 
         if($SchoolID -eq '51'){
