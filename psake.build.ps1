@@ -15,7 +15,7 @@ task default -depends clean, build, "Test\Functions"
 task "Test\Functions" {
     $mms = [PSCustomObject]@{
         SchoolID = '51'
-        GradYear = '2026' # UPDATE THIS EACH YEAR
+        GradYear = '2027' # UPDATE THIS EACH YEAR
         Grade_Level = "5"
         Last_Name = "Kafka"
         First_Name = "Jimmy"
@@ -24,7 +24,7 @@ task "Test\Functions" {
     }
     $elm = [PSCustomObject]@{
         SchoolID = '6'
-        GradYear = '2027' # UPDATE THIS EACH YEAR
+        GradYear = '2028' # UPDATE THIS EACH YEAR
         Grade_Level = "4"
         Last_Name = "Picard-Sampson"
         First_Name = "Brock"
@@ -33,7 +33,7 @@ task "Test\Functions" {
     }
     $elmNC = [PSCustomObject]@{
         SchoolID = '6'
-        GradYear = '2032' # UPDATE THIS EACH YEAR
+        GradYear = '2033' # UPDATE THIS EACH YEAR
         Grade_Level = "-1"
         Last_Name = "Picard-Sampson"
         First_Name = "Frank"
@@ -70,12 +70,12 @@ task "Test\Functions" {
     }
     $Expectations = @{
         mms = @{
-            UserName = "KafkaJ26"
+            UserName = "KafkaJ27"
             Password = ""
-            ADGroups = "G2026,AD-MMS-Print-Students,InetFilter-5-8"
+            ADGroups = "G2027,AD-MMS-Print-Students,InetFilter-5-8"
             ADProperties = @{
                 OU = "ou=" + $MMS.GradYear + "," + $data.school.'51'.ou.students
-                Email = "KafkaJ26@mpssites.org"
+                Email = "KafkaJ27@mpssites.org"
                 Pager = $mms.student_number
                 Description = $data.school.'51'.Initials + " Student"
                 DisplayName = $mms.Last_Name + ", " + $mms.First_Name
@@ -83,12 +83,12 @@ task "Test\Functions" {
             }
         }
         elm = @{
-            UserName = "PicardSampsonB27"
+            UserName = "PicardSampsonB28"
             Password = "bp8262012"
             ADGroups = "InetFilter-MES"
             ADProperties = @{
                 OU = "ou=" + $elm.GradYear + "," + $data.school.'6'.ou.students
-                Email = "PicardSampsonB27@mpssites.org"
+                Email = "PicardSampsonB28@mpssites.org"
                 Pager = $elm.student_number
                 Description = $data.school.'6'.Initials + " Student"
                 DisplayName = $elm.Last_Name + ", " + $elm.First_Name

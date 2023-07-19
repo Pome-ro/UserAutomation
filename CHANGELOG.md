@@ -1,5 +1,9 @@
 # Change Log
 
+## 7/29/2023
+
+- Corrected the cut off grad year for the new convention to 2030.
+  
 ## 6/21/2023
 
 - Students usernames and email addresses are now in the `<student_number>@mpssites.org` format.

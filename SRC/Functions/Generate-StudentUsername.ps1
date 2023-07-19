@@ -21,7 +21,7 @@ function Generate-StudentUsername {
 
         $intGradYear = [int]$student.CalcGradYear
 
-        if ($intGradYear -ge 2032) {
+        if ($intGradYear -ge 2030) {
             Write-Host "Processing New Naming Convention"
             $SamAccountName = $student.student_number
             $UserPrincipalName = "$($student.student_number)@mpssites.org"

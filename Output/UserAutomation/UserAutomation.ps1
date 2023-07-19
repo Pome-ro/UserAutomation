@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 23.6.21.709
+.VERSION 23.7.19.784
 
 .GUID 539d6a11-ba99-4fb0-9f51-d5a8c8c6ba93
 
@@ -103,7 +103,7 @@ function Generate-StudentUsername {
 
         $intGradYear = [int]$student.CalcGradYear
 
-        if ($intGradYear -ge 2032) {
+        if ($intGradYear -ge 2030) {
             Write-Host "Processing New Naming Convention"
             $SamAccountName = $student.student_number
             $UserPrincipalName = "$($student.student_number)@mpssites.org"
